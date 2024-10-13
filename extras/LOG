@@ -1,0 +1,135 @@
+# output usage message
+$ dist/index.js
+usage: index.js MONGO_URL CMD KEY=VALUE...
+    for CMD in addBook|clear|checkoutBook|findBooks|loadPaths|returnBook
+
+# clear out db
+$ dist/index.js mongodb://localhost:27017/books clear
+
+# load books from course data file
+$  node dist/index.js mongodb://localhost:27017/books loadPaths path=data/books.json 
+
+# search for "definitive javascript" books
+$ dist/index.js mongodb://localhost:27017/books \
+  		findBooks search="definitive javascript"
+[
+  {
+    nCopies: 2,
+    isbn: '021-578-548-4',
+    title: 'JavaScript: The Definitive Guide',
+    authors: [ 'Uecker, Koby', 'Chamlee, Lorena' ],
+    pages: 421,
+    year: 2011,
+    publisher: 'New Starch'
+  },
+  {
+    nCopies: 2,
+    isbn: '149-195-202-4',
+    title: 'JavaScript: The Definitive Guide, 7th Edition',
+    authors: [ 'David Flanagan' ],
+    pages: 704,
+    year: 2020,
+    publisher: "O'Reilly"
+  }
+]
+
+# search for "definitive javascript flanagan" books
+$ dist/index.js mongodb://localhost:27017/books \
+      		findBooks search="definitive javascript flanagan"
+[
+  {
+    nCopies: 2,
+    isbn: '149-195-202-4',
+    title: 'JavaScript: The Definitive Guide, 7th Edition',
+    authors: [ 'David Flanagan' ],
+    pages: 704,
+    year: 2020,
+    publisher: "O'Reilly"
+  }
+]
+
+# add another copy of Flanagan's book; note # of copies changed from 2 to 3
+$ dist/index.js mongodb://localhost:27017/books \
+  		addBook isbn="149-195-202-4" \
+			title="JavaScript: The Definitive Guide, 7th Edition" \
+			authors="[David Flanagan]" \
+			pages=704 \
+			year=2020 \
+			publisher="O'Reilly"
+{
+  nCopies: 3,
+  isbn: '149-195-202-4',
+  title: 'JavaScript: The Definitive Guide, 7th Edition',
+  authors: [ 'David Flanagan' ],
+  pages: 704,
+  year: 2020,
+  publisher: "O'Reilly"
+}
+
+# book details must match exactly, no whitespace after JavaScript: in title
+$ dist/index.js mongodb://localhost:27017/books \
+  		addBook isbn="149-195-202-4" \
+			title="JavaScript:The Definitive Guide, 7th Edition" \
+			authors="[David Flanagan]" \
+			pages=704 \
+			year=2020 \
+			publisher="O'Reilly"
+BAD_REQ: inconsistent title data for book 149-195-202-4; widget=title
+
+# checkoutBook but missing params
+$ dist/index.js mongodb://localhost:27017/books checkoutBook
+MISSING: isbn is required; path=isbn
+MISSING: patronId is required; path=patronId
+
+# incorrect isbn
+$ dist/index.js mongodb://localhost:27017/books \
+  		checkoutBook patronId=zerksis \
+			     isbn=149-195-202-5
+BAD_REQ: unknown book 149-195-202-5; widget=isbn
+
+# jane successfully checks it out; 2 copies left
+$ dist/index.js mongodb://localhost:27017/books \
+  		checkoutBook patronId=jane \
+			     isbn=149-195-202-4
+
+# she cannot check it out again
+$ dist/index.js mongodb://localhost:27017/books \
+  		checkoutBook patronId=jane \
+			     isbn=149-195-202-4
+BAD_REQ: patron jane already has book 149-195-202-4 checked out; widget=isbn
+
+# john checks it out; 1 copy left.
+$ dist/index.js mongodb://localhost:27017/books \
+  		checkoutBook patronId=john \
+			     isbn=149-195-202-4
+
+# sue checks it out; no copies left
+$ dist/index.js mongodb://localhost:27017/books \
+  		checkoutBook patronId=sue \
+			     isbn=149-195-202-4
+
+# zerksis cannot check it out since there are no copies left in library
+$ dist/index.js mongodb://localhost:27017/books \
+  		checkoutBook patronId=zerksis \
+			     isbn=149-195-202-4
+BAD_REQ: no copies of book 149-195-202-4 are available for checkout; widget=isbn
+
+# john returns his copy
+$ dist/index.js mongodb://localhost:27017/books \
+  		returnBook patronId=john \
+			   isbn=149-195-202-4
+
+# now zerksis can check it out
+$ dist/index.js mongodb://localhost:27017/books \
+  		checkoutBook patronId=zerksis \
+			     isbn=149-195-202-4
+			     
+# clear database
+$ dist/index.js mongodb://localhost:27017/books clear
+
+# no books to checkout!
+$ dist/index.js mongodb://localhost:27017/books \
+  		checkoutBook patronId=zerksis \
+			     isbn=149-195-202-4
+BAD_REQ: unknown book 149-195-202-4; widget=isbn
+$ 
