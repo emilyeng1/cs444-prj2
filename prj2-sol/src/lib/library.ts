@@ -2,6 +2,7 @@ import { Errors } from 'cs544-js-utils';
 import { zodToResult } from './zod-utils.js';
 
 import { z } from 'zod';
+import main from './main.js';
 
 const GUTENBERG_YEAR = 1448;
 const NOW_YEAR = new Date().getFullYear();
@@ -24,13 +25,13 @@ const MSGS = {
 //   publisher: a non-empty string.
 //   nCopies: an optional positive integer
 const Book =  z.object({
-  isbn: z.string(),
-  title: z.string(),
-  authors: z.string().array(),
-  pages: z.number(),
-  year: z.number(),
-  publisher: z.string(),
-  nCopies: z.number(),
+  isbn: z.string().regex(/^\d{3}-\d{3}-\d{3}-\d{1}$/),
+  title: z.string().min(1),
+  authors: /*z.string().array()*/z.array(z.string().min(1)).min(1),
+  pages: z.number().int().positive(),
+  year: z.number().min(GUTENBERG_YEAR).max(NOW_YEAR),
+  publisher: z.string().min(1),
+  nCopies: z.number().int().positive().optional(),
 });
 
 export type Book = z.infer<typeof Book>;
@@ -43,9 +44,9 @@ export type XBook = z.infer<typeof XBook>;
 //   index: an optional non-negative integer.
 //   count: an optional non-negative integer.
 const Find = z.object({
-  search: z.string(),
-  index: z.number(),
-  count: z.number(),
+  search: z.string().regex(/\b\w{2,}\b/),
+  index: z.number().int().min(0).optional(),
+  count: z.number().int().min(0).optional(),
 });
 export type Find = z.infer<typeof Find>;
 
@@ -53,8 +54,8 @@ export type Find = z.infer<typeof Find>;
 //   isbn: a ISBN-10 string of the form ddd-ddd-ddd-d.
 //   patronId: a non-empty string.
 const Lend = z.object({
-  isbn: z.string(),
-  patronId: z.string(),
+  isbn: z.string().regex(/^\d{3}-\d{3}-\d{3}-\d{1}$/),
+  patronId: z.string().min(1),
 });
 export type Lend = z.infer<typeof Lend>;
 
