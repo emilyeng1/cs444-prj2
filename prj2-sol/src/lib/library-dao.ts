@@ -18,9 +18,15 @@ const MONGO_OPTIONS = {
 
 export class LibraryDao {
 
+  // NEW ADDITIONS
+  private booksCollection: mongo.Collection;
+  private patronCollection: mongo.Collection;
   //called by below static make() factory function with
   //parameters to be cached in this instance.
-  constructor(todo: string) {
+  constructor(private readonly client: mongo.MongoClient) {
+    const db = this.client.db();
+    this.booksCollection = db.collection('books');
+    this.patronCollection = db.collection('patrons');
   }
 
   //static factory function; should do all async operations like
@@ -29,7 +35,16 @@ export class LibraryDao {
   //returns error code DB on database errors.
   static async make(dbUrl: string) : Promise<Errors.Result<LibraryDao>> {
     try {
-      return Errors.okResult(new LibraryDao('TODO'));
+      const client = await (new mongo.MongoClient(dbUrl)).connect();
+      const db = client.db();
+
+      const booksCollection = db.collection('books');
+      const patronCollection = db.collection('patrons');
+
+      await booksCollection.createIndex({isbn: 1}, {unique: true});
+      await patronCollection.createIndex({id: 1}, {unique: true});
+      return Errors.okResult(new LibraryDao(client));
+      // return Errors.okResult(new LibraryDao('TODO'));
     }
     catch (error) {
       return Errors.errResult(error.message, 'DB');
@@ -43,11 +58,129 @@ export class LibraryDao {
    *    DB: a database error was encountered.
    */
   async close() : Promise<Errors.Result<void>> {
-    return Errors.errResult('TODO');
+    try {
+      await this.client.close();
+      return Errors.VOID_RESULT;
+    }
+    catch (err) {
+      return Errors.errResult((err as Error).message, 'DB');
+    }
+    // return Errors.errResult('TODO');
   }
   
   //add methods as per your API
+  async addBook(book: Lib.XBook) : Promise<Errors.Result<Lib.XBook>> {
+    try {
+      const booksCollection = this.client.db().collection('books');
+      const existingBook = await this.booksCollection.findOne({isbn: book.isbn});
+
+      if (existingBook) {
+        const updateResult = await booksCollection.updateOne({isbn : book.isbn}, {Sinc: {nCopies: book.nCopies}});
+        if (!updateResult.matchedCount) {
+          return Errors.errResult('Failed to update book copies', 'DB');
+        }
+      }
+      else {
+        await this.booksCollection.insertOne(book);
+      }
+
+      return Errors.okResult(book);
+    }
+    catch (error) {
+      return Errors.errResult(error.message, 'DB');
+    }
+  }
+
+  async findBooksBySearch(searchWords: string[], index: number, count: number) : Promise<Errors.Result<Lib.XBook[]>> {
+    try {
+      const query = {
+        Sor: [
+          {title: {Sregex: searchWords.join('|'), Soptions: 'i'}},
+          {authors: {Sin: searchWords.map(word => new RegExp(word, 'i'))}}
+        ]
+      };
+
+      const rawBooks = await this.booksCollection
+        .find(query)
+        .skip(index)
+        .limit(count)
+        .sort({title: 1})
+        .toArray();
+
+      const books: Lib.XBook[] = rawBooks.map((doc) => {
+        return {
+          isbn: doc.isbn,
+          title: doc.title,
+          authors: doc.authors,
+          publisher: doc.publisher,
+          pages: doc.pages,
+          year: doc.year,
+          nCopies: doc.nCopies,
+        } as Lib.XBook;
+      });
+
+      return Errors.okResult(books);
+    }
+    catch (error) {
+      return Errors.errResult(error.message, 'DB');
+    }
+  }
+
+  async checkoutBook(patronId: string, isbn: string) : Promise<Errors.Result<void>> {
+    try {
+      const book = await this.booksCollection.findOne({isbn});
+
+      if (!book) {
+        return Errors.errResult('Book not found', 'BAD_REQ');
+      }
+      if (book.nCopies <= 0) {
+        return Errors.errResult('No copies available for checkout', 'BAD_REQ');
+      }
+
+      const patron = await this.patronCollection.findOne({id: patronId});
+      if (patron && patron.checkedOutBooks.includes(isbn)) {
+        return Errors.errResult('Patron already checked out this book', 'BAD_REQ');
+      }
+
+      await this.booksCollection.updateOne({isbn}, {Sinc: {nCopies: -1}});
+
+      await this.patronCollection.updateOne({id:patronId}, {SaddToSet: {checkOutBooks: isbn}}, {upsert: true});
+
+      return Errors.okResult(undefined);
+    }
+    catch (error) {
+      return Errors.errResult(error.message, 'DB');
+    }
+  }
+
+  async returnBook(patronId: string, isbn: string) : Promise<Errors.Result<void>> {
+    try {
+      const patron = await this.patronCollection.findOne({id: patronId});
+
+    if (!patron || !patron.checkedOutBooks.incldues(isbn)) {
+      return Errors.errResult('No record of this book being checked out by the patron', 'BAD_REQ');
+    }
+
+    await this.booksCollection.updateOne({isbn}, {Sinc: {nCopies: 1}});
+    
+    await this.patronCollection.updateOne({id: patronId}, {Spull: {checkedOutBooks: isbn}});
+
+    return Errors.okResult(undefined);
+  }
+  catch (error) {
+    return Errors.errResult(error.message, 'DB');
+  }
+}
+
+async clearDatabase() : Promise<Errors.Result<void>> {
+  try {
+    await this.booksCollection.deleteMany({});
+    await this.patronCollection.deleteMany({});
+    return Errors.okResult(undefined);
+  }
+  catch (error) {
+    return Errors.errResult(error.message, 'DB');
+  }
+}
 
 } //class LibDao
-
-

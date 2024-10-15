@@ -2,6 +2,7 @@ import { Errors } from 'cs544-js-utils';
 
 import { LibraryDao } from './library-dao.js';
 import * as Lib from './library.js';
+import { BOOKS } from 'src/test/test-data.js';
 
 /** Note that errors are documented using the `code` option which must be
  *  returned (the `message` can be any suitable string which describes
@@ -27,7 +28,14 @@ export class LendingLibrary {
 
   /** clear out underlying db */
   async clear() : Promise<Errors.Result<void>> {
-    return Errors.errResult('TODO');
+    // return Errors.errResult('TODO');
+    try {
+      await this.dao.clearDatabase(); // create method in library-dao for clearing
+      return Errors.okResult(undefined);
+    }
+    catch (error) {
+      return Errors.errResult(error.message, 'DB');
+    }
   }
 
   /** Add one-or-more copies of book represented by req to this library.
@@ -48,7 +56,68 @@ export class LendingLibrary {
    *      inconsistent with the data already present.
    */
   async addBook(req: Record<string, any>): Promise<Errors.Result<Lib.XBook>> {
-    return Errors.errResult('TODO');
+    try {
+      const requiredFields = ['isbn', 'title', 'pages', 'authors', 'publisher', 'year', 'nCopies'];
+      for (const field of requiredFields) {
+        if (!(field in req)) {
+          return Errors.errResult('Missing required field: ${field}', 'MISSING');
+        }
+      }
+
+      if (typeof req.isbn !== 'string') {
+        return Errors.errResult('ISBN must be a string', 'BAD_TYPE');
+      }
+      if (!/^\d{3}-\d{3}-\d{3}-\d{1}$/.test(req.isbn)) {
+        return Errors.errResult('Invalid ISBN format, must be in ISBN-10 format: ddd-ddd-ddd-d', 'BAD_REQ');
+      }
+      if (typeof req.title !== 'string') {
+        return Errors.errResult('Title must be a string', 'BAD_TYPE');
+      }
+      if (req.title.trim() === '') {
+        return Errors.errResult('Title cannot be empty', 'BAD_REQ');
+      }
+      if (typeof req.pages !== 'number' || !Number.isInteger(req.pages) || req.pages <= 0) {
+        return Errors.errResult('Pages must be a positive integer', 'BAD_TYPE');
+      }
+      if (!Array.isArray(req.authors)) {
+        return Errors.errResult('Authors must be an array', 'BAD_TYPE');
+      }
+      if (req.authors.length === 0 || req.authors.some(a => typeof a !== 'string' || a.trim() === '')) {
+        return Errors.errResult('Authors array cannot be empty or contain an empty author', 'BAD_REQ');
+      }
+      if (typeof req.publisher !== 'string') {
+        return Errors.errResult('Publisher must be a string', 'BAD_TYPE');
+      }
+      if (req.publisher.trim() === '') {
+        return Errors.errResult('Publisher cannot be empty', 'BAD_REQ');
+      }
+      if (typeof req.year !== 'number') {
+        return Errors.errResult('Year must be a number', 'BAD_TYPE');
+      }
+      if (req.year < 1448 || req.year > new Date().getFullYear()) {
+        return Errors.errResult('Year must be in range [1448, currentYear]', 'BAD_REQ');
+      }
+      if (typeof req.nCopies !== 'number' || !Number.isInteger(req.nCopies) || req.nCopies <= 0) {
+        return Errors.errResult('nCopies must be a positive integer', 'BAD_TYPE');
+      }
+
+      const book: Lib.XBook = {
+        isbn: req.isbn,
+        title: req.title,
+        pages: req.pages,
+        authors: req.authors,
+        publisher: req.publisher,
+        year: req.year,
+        nCopies: req.nCopies
+      };
+
+      const result = await this.dao.addBook(book); // make addBook method in library-dao
+      return result;
+    }
+    catch (error) {
+      return Errors.errResult(error.message, 'DB');
+    }
+    // return Errors.errResult('TODO');
   }
 
   /** Return all books whose authors and title fields contain all
@@ -70,10 +139,28 @@ export class LendingLibrary {
    *    BAD_TYPE: search field is not a string or index/count are not numbers.
    *    BAD_REQ: no words in search, index/count not int or negative.
    */
-  async findBooks(req: Record<string, any>)
-    : Promise<Errors.Result<Lib.XBook[]>>
+  async findBooks(req: Record<string, any>) : Promise<Errors.Result<Lib.XBook[]>>
   {
-    return Errors.errResult('TODO');
+    try {
+      if (!req.search || typeof req.search !== 'string') {
+        return Errors.errResult('Search field is missing or not a string', 'MISSING');
+      }
+
+      const index = typeof req.index === 'number' && req.index >= 0 ? req.index : 0;
+      const count = typeof req.count === 'number' && req.count >= 0 ? req.count : DEFAULT_COUNT;
+
+      const searchWords = req.search.match(/\w{2,}/g) || [];
+      if (searchWords.length === 0) {
+        return Errors.errResult('No valid search words found', 'BAD_REQ');
+      }
+
+      const books = await this.dao.findBooksBySearch(searchWords, index, count); // create method in library-dao
+      return books;
+    }
+    catch (error) {
+      return Errors.errResult(error.message, 'DB');
+    }
+    // return Errors.errResult('TODO');
   }
 
 
@@ -88,7 +175,25 @@ export class LendingLibrary {
    *      patron already has a copy of the same book checked out
    */
   async checkoutBook(req: Record<string, any>) : Promise<Errors.Result<void>> {
-    return Errors.errResult('TODO');
+    try {
+      const {patronId, isbn} = req;
+      if (!patronId || typeof patronId !== 'string') {
+        return Errors.errResult('Missing or invalid patronId', 'MISSING');
+      }
+      if (!isbn || typeof isbn !== 'string') {
+        return Errors.errResult('Missing or invalid ISBN', 'MISSING');
+      }
+
+      const result = await this.dao.checkoutBook(patronId, isbn); // make method
+      if (!result.isOk) {
+        return Errors.errResult('Issue checking out this book', 'BAD_REQ');
+      }
+      return Errors.okResult(undefined);
+    }
+    catch (error) {
+      return Errors.errResult(error.message, 'DB');
+    }
+    // return Errors.errResult('TODO');
   }
 
   /** Set up patron req.patronId to returns book req.isbn.
@@ -101,7 +206,25 @@ export class LendingLibrary {
    *    no checkout of the book by patronId.
    */
   async returnBook(req: Record<string, any>) : Promise<Errors.Result<void>> {
-    return Errors.errResult('TODO');
+    try {
+      const {patronId, isbn} = req;
+      if (!patronId || typeof patronId !== 'string') {
+        return Errors.errResult('Missing or invalid patronId', 'MISSING');
+      }
+      if (!isbn || typeof isbn !== 'string') {
+        return Errors.errResult('Missing or invalid ISBN', 'MISSING');
+      }
+
+      const result = await this.dao.returnBook(patronId, isbn); // make method
+      if (!result.isOk) {
+        return Errors.errResult('Issue returning this book', 'BAD_REQ');
+      }
+      return Errors.okResult(undefined);
+    }
+    catch (error) {
+      return Errors.errResult(error.message, 'DB');
+    }
+    // return Errors.errResult('TODO');
   }
 
   //add class code as needed
