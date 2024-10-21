@@ -4,3 +4,17 @@ Email:		eeng8@binghamton.edu
 
 Add text here as needed to document the status of your project.
 
+To get the dist and node_modules files, first run:
+
+> $ npm ci node ./dist/index.js
+
+Followed by:
+
+> $ npm run build
+
+This should generate the /dist and /node_modules folder. You should
+be able to run
+
+> $ npm test
+
+without any issues afterwords.
