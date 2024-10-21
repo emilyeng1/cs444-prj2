@@ -1,0 +1,3 @@
+# ignore node_modules and dist folder
+prj2-sol/node_modules
+prj2-sol/dist
