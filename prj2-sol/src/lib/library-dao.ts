@@ -75,7 +75,7 @@ export class LibraryDao {
       const existingBook = await this.booksCollection.findOne({ isbn: book.isbn });
 
       if (existingBook) {
-        const updateResult = await booksCollection.updateOne({ isbn: book.isbn }, { Sinc: { nCopies: book.nCopies } });
+        const updateResult = await booksCollection.updateOne({ isbn: book.isbn }, { $inc: { nCopies: book.nCopies } });
         if (!updateResult.matchedCount) {
           return Errors.errResult('Failed to update book copies', 'DB');
         }
@@ -142,9 +142,9 @@ export class LibraryDao {
         return Errors.errResult('Patron already checked out this book', 'BAD_REQ');
       }
 
-      await this.booksCollection.updateOne({ isbn }, { Sinc: { nCopies: -1 } });
+      await this.booksCollection.updateOne({ isbn }, { $inc: { nCopies: -1 } });
 
-      await this.patronCollection.updateOne({ id: patronId }, { SaddToSet: { checkOutBooks: isbn } }, { upsert: true });
+      await this.patronCollection.updateOne({ id: patronId }, { $addToSet: { checkOutBooks: isbn } }, { upsert: true });
 
       return Errors.okResult(undefined);
     }
@@ -161,9 +161,12 @@ export class LibraryDao {
         return Errors.errResult('No record of this book being checked out by the patron', 'BAD_REQ');
       }
 
-      await this.booksCollection.updateOne({ isbn }, { Sinc: { nCopies: 1 } });
+      await this.booksCollection.updateOne({ isbn }, { $inc: { nCopies: 1 } });
 
-      await this.patronCollection.updateOne({ id: patronId }, { Spull: { checkedOutBooks: isbn } });
+      // TODO: fix issue with checkedOutBooks having type never
+      // The pull operation can't run otherwise. Might have to do with checkedOutBooks
+      // defaulting to type never?
+      // await this.patronCollection.updateOne({ id: patronId }, { $pull: { checkedOutBooks: isbn } });
 
       return Errors.okResult(undefined);
     }
