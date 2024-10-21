@@ -55,7 +55,6 @@ describe('Book validation', () => {
   it('badly typed fields makes a good book invalid', () => {
     for (const [k, v] of Object.entries(BOOK_1)) {
       const req: Record<string, any> = { ...BOOK_1, [k]: true };
-      console.log(req)
       const result = Lib.validate('addBook', req);
       assert(result.isOk === false);
       expect(result.errors.length).to.be.gt(0);
