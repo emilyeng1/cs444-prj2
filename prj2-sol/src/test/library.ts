@@ -1,3 +1,4 @@
+import { privateEncrypt } from 'crypto';
 import * as Lib from '../lib/library.js';
 
 import { BOOKS } from './test-data.js'
@@ -35,7 +36,12 @@ describe('Book validation', () => {
   });
 
   it('having no authors is invalid', () => {
-    assert.fail('TODO');
+    const req: Record<string, any> = { ...BOOK_1 };
+    req.authors = [];
+    const result = Lib.validate('addBook', req);
+    assert(result.isOk === false);
+    expect(result.errors.length).to.be.gt(0);
+    // assert.fail('TODO');
   });
 
   it('an empty author is invalid', () => {
@@ -47,7 +53,14 @@ describe('Book validation', () => {
   });
 
   it('badly typed fields makes a good book invalid', () => {
-    assert.fail('TODO');
+    for (const [k, v] of Object.entries(BOOK_1)) {
+      const req: Record<string, any> = { ...BOOK_1, [k]: true };
+      console.log(req)
+      const result = Lib.validate('addBook', req);
+      assert(result.isOk === false);
+      expect(result.errors.length).to.be.gt(0);
+    }
+    // assert.fail('TODO');
   });
 
   it('empty string fields makes a good book invalid', () => {
