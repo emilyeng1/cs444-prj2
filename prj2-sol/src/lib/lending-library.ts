@@ -3,6 +3,7 @@ import { Errors } from 'cs544-js-utils';
 import { LibraryDao } from './library-dao.js';
 import * as Lib from './library.js';
 import { BOOKS } from 'src/test/test-data.js';
+import { privateDecrypt, privateEncrypt } from 'crypto';
 
 /** Note that errors are documented using the `code` option which must be
  *  returned (the `message` can be any suitable string which describes
@@ -27,7 +28,7 @@ export class LendingLibrary {
   }
 
   /** clear out underlying db */
-  async clear() : Promise<Errors.Result<void>> {
+  async clear(): Promise<Errors.Result<void>> {
     // return Errors.errResult('TODO');
     try {
       await this.dao.clearDatabase(); // create method in library-dao for clearing
@@ -139,11 +140,22 @@ export class LendingLibrary {
    *    BAD_TYPE: search field is not a string or index/count are not numbers.
    *    BAD_REQ: no words in search, index/count not int or negative.
    */
-  async findBooks(req: Record<string, any>) : Promise<Errors.Result<Lib.XBook[]>>
-  {
+  async findBooks(req: Record<string, any>): Promise<Errors.Result<Lib.XBook[]>> {
     try {
       if (!req.search || typeof req.search !== 'string') {
         return Errors.errResult('Search field is missing or not a string', 'MISSING');
+      }
+      if (typeof req.index !== 'number' && typeof req.index !== 'undefined') {
+        return Errors.errResult('Index must be a number', 'BAD_TYPE');
+      }
+      if (typeof req.count !== 'number' && typeof req.count !== 'undefined') {
+        return Errors.errResult('Count must be a number', 'BAD_TYPE');
+      }
+      if (typeof req.index === 'number' && (!Number.isInteger(req.index) || req.index < 0)) {
+        return Errors.errResult('Index must be a non-negative integer', 'BAD_REQ');
+      }
+      if (typeof req.count === 'number' && (!Number.isInteger(req.count) || req.count < 0)) {
+        return Errors.errResult('Count must be a non-negative integer', 'BAD_REQ');
       }
 
       const index = typeof req.index === 'number' && req.index >= 0 ? req.index : 0;
@@ -154,6 +166,9 @@ export class LendingLibrary {
         return Errors.errResult('No valid search words found', 'BAD_REQ');
       }
 
+      // TODO: make books find results for multi-word searches
+      // Current issue is that books only stores the most recent book found if there's
+      // a multi word search (test code example: ["definitive", 'JAVASCRIPT]))
       const books = await this.dao.findBooksBySearch(searchWords, index, count); // create method in library-dao
       return books;
     }
@@ -174,9 +189,9 @@ export class LendingLibrary {
    *      no copies of the book are available for checkout
    *      patron already has a copy of the same book checked out
    */
-  async checkoutBook(req: Record<string, any>) : Promise<Errors.Result<void>> {
+  async checkoutBook(req: Record<string, any>): Promise<Errors.Result<void>> {
     try {
-      const {patronId, isbn} = req;
+      const { patronId, isbn } = req;
       if (!patronId || typeof patronId !== 'string') {
         return Errors.errResult('Missing or invalid patronId', 'MISSING');
       }
@@ -205,9 +220,9 @@ export class LendingLibrary {
    *    isbn does not specify a book in the library or there is
    *    no checkout of the book by patronId.
    */
-  async returnBook(req: Record<string, any>) : Promise<Errors.Result<void>> {
+  async returnBook(req: Record<string, any>): Promise<Errors.Result<void>> {
     try {
-      const {patronId, isbn} = req;
+      const { patronId, isbn } = req;
       if (!patronId || typeof patronId !== 'string') {
         return Errors.errResult('Missing or invalid patronId', 'MISSING');
       }
@@ -235,14 +250,14 @@ export class LendingLibrary {
 const DEFAULT_COUNT = 5;
 
 //add file level code as needed
-  
+
 
 /********************** Domain Utility Functions ***********************/
 
 /** return a field where book0 and book1 differ; return undefined if
  *  there is no such field.
  */
-function compareBook(book0: Lib.Book, book1: Lib.Book) : string|undefined {
+function compareBook(book0: Lib.Book, book1: Lib.Book): string | undefined {
   if (book0.title !== book1.title) return 'title';
   if (book0.authors.some((a, i) => a !== book1.authors[i])) return 'authors';
   if (book0.pages !== book1.pages) return 'pages';
