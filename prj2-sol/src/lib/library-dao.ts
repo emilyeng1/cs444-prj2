@@ -76,7 +76,6 @@ export class LibraryDao {
   //add methods as per your API
   async addBook(book: Lib.XBook): Promise<Errors.Result<Lib.XBook>> {
     try {
-      //const booksCollection = this.client.db().collection('books');
       const existingBook = await this.booksCollection.findOne({ isbn: book.isbn });
 
       if (existingBook) { //added this.
@@ -98,11 +97,9 @@ export class LibraryDao {
 
   async findBooksBySearch(searchWords: string[], index: number, count: number): Promise<Errors.Result<Lib.XBook[]>> {
     try {
-      //added the multiWordSearch thing idk if it's working if ima be fr
-      const multiWordSearch = searchWords.length > 1 ? searchWords.join('.*') : searchWords[0];
+      const multiWordSearch = searchWords.map(word => `(?=.*${word})`).join('');
       const query = {
         $or: [
-          //changed this
           { title: { $regex: multiWordSearch, $options: 'i' } },
           { authors: { $regex: multiWordSearch, $options: 'i' } }
         ]
@@ -171,10 +168,6 @@ export class LibraryDao {
 
       await this.booksCollection.updateOne({ isbn }, { $inc: { nCopies: 1 } });
 
-      // TODO: fix issue with checkedOutBooks having type never
-      // The pull operation can't run otherwise. Might have to do with checkedOutBooks
-      // defaulting to type never?
-      // await this.patronCollection.updateOne({ id: patronId }, { $pull: { checkedOutBooks: isbn } });
       await this.patronCollection.updateOne({ id: patronId }, { $pull: { checkedOutBooks: isbn } });
       return Errors.okResult(undefined);
     }

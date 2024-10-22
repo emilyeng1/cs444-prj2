@@ -2,7 +2,7 @@
   "devDependencies": {
     "@types/chai": "^5.0.0",
     "@types/mocha": "^10.0.9",
-    "@types/node": "^22.7.7",
+    "@types/node": "^22.7.8",
     "@types/semver": "^7.5.8",
     "chai": "^5.1.1",
     "mocha": "^10.7.3",
@@ -13,7 +13,8 @@
   "dependencies": {
     "cs544-js-utils": "file:cs544-js-utils.tgz",
     "cs544-node-utils": "file:cs544-node-utils.tgz",
-    "mongodb": "^6.9.0",
+    "mongo": "^0.1.0",
+    "mongodb": "^6.10.0",
     "zod": "^3.23.8"
   },
   "scripts": {
